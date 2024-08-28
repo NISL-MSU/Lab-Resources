@@ -1,0 +1,40 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Montana State University, NISL Template   %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% created by Patrick Donnelly, 2012-2015    %
+% patrick.donnelly2@cs.montana.edu          %
+% managed by William Jardee, 2023           %
+% william.jardee@montana.edu                %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\mode<presentation>
+
+\typeout{Document Style `NISL MSU'.}
+
+
+% Requirement
+\RequirePackage{tikz}
+\RequirePackage{geometry}
+% \RequirePackage{svg}
+
+\hfuzz = 100pt
+
+
+% declare logo mode to add logos to every slide
+\newif\if@logos\@logosfalse
+\DeclareOption{logos}{
+  \@logostrue
+}
+
+\DeclareOption*{\PackageWarning{NISL_MSU}{Unknown ‘\CurrentOption’}}
+\ProcessOptions\relax
+
+%Settings
+\usepackage{beamercolorthemeNISL_MSU}
+\usepackage{beamerouterthemeNISL_MSU}
+\usepackage{beamerinnerthemeNISL_MSU}
+
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{blocks}[rounded][shadow=true]  
+
+\mode<all>
