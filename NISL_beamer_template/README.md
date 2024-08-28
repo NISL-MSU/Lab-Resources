@@ -1,2 +1,2 @@
 # NISL beamer
-See [https://github.com/WillJardee/compact_latex](Compact Latex) for a more complete introduction.
+See [Compact Latex](https://github.com/WillJardee/compact_latex) for a more complete introduction.
