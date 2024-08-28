@@ -1,5 +1,5 @@
 # NISL Lab Resources
-This is a collection of various templates and matterials we often have floating around. 
+This is a collection of various templates and materials we often have floating around. 
 
 ## More Resources
 See the following list for resources that are not here, but may be useful
