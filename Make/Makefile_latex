@@ -1,52 +1,131 @@
 LATEX = latexmk
 
-# Directory containing SVG files
+# Find all .tex files in the current directory
+TEX_FILES := $(wildcard *.tex)
+PDF_FILES := $(patsubst %.tex,%.pdf,$(TEX_FILES))
+
+# Directory containing image files
 IMG_DIR := images
 
-# Find all SVG files in the images directory
+# Find all SVG and EPS files in the images directory
 SVG_FILES := $(wildcard $(IMG_DIR)/*.svg)
+EPS_FILES := $(wildcard $(IMG_DIR)/*.eps)
 
 # Define the corresponding PDF files
-PDF_FILES := $(patsubst %.svg,%.pdf,$(SVG_FILES))
+SVG_PDF_FILES := $(patsubst %.svg,%.pdf,$(SVG_FILES))
+EPS_PDF_FILES := $(patsubst %.eps,%.pdf,$(EPS_FILES))
 
-# Check if ImageMagick is installed
+# Check if required tools are installed
 IMAGEMAGICK_INSTALLED := $(shell command -v convert >/dev/null 2>&1 && echo yes || echo no)
+INKSCAPE_INSTALLED := $(shell command -v inkscape >/dev/null 2>&1 && echo yes || echo no)
+EPSTOPDF_INSTALLED := $(shell command -v epspdf >/dev/null 2>&1 && echo yes || echo no)
+GS_INSTALLED := $(shell command -v gs >/dev/null 2>&1 && echo yes || echo no)
+PANDOC_INSTALLED := $(shell command -v pandoc >/dev/null 2>&1 && echo yes || echo no)
 
-default: check-imagemagick convert-pdfs pdf
+# Main targets
+all: check-dependencies images $(PDF_FILES) other-formats
 
-.PHONY: all clean check-imagemagick convert-pdfs
+.PHONY: all clean check-dependencies images pdfs other-formats optimize-pdfs html epub
 
 clean:
 	${LATEX} -c
-	rm -f *.vtc *.bbl *.snm *.nav *.run.xml $(IMG_DIR)/*.pdf
+	rm -f *.vtc *.bbl *.snm *.nav *.run.xml *.html *.epub
 
 veryclean: clean
+	rm -f $(IMG_DIR)/*.pdf *_optimized.pdf
 	${LATEX} -C
 
-# Rule to check if ImageMagick is installed
-check-imagemagick:
-ifeq ($(IMAGEMAGICK_INSTALLED),yes)
-	@echo "ImageMagick is installed."
-else
-	@echo "Warning: ImageMagick is not installed. SVG to PDF conversion will be skipped."
-endif
+# Rule to check if required tools are installed
+check-dependencies:
+	@echo "Checking dependencies..."
+	@if [ "$(INKSCAPE_INSTALLED)" = "no" ]; then \
+		echo "Warning: Inkscape is not installed. SVG to PDF conversion may fall back to ImageMagick."; \
+	fi
+	@if [ "$(EPSTOPDF_INSTALLED)" = "no" ]; then \
+		echo "Warning: epspdf is not installed. EPS to PDF conversion may fall back to ImageMagick."; \
+	fi
+	@if [ "$(IMAGEMAGICK_INSTALLED)" = "no" ]; then \
+		echo "Warning: ImageMagick is not installed. This may affect image conversions."; \
+	fi
+	@if [ "$(GS_INSTALLED)" = "no" ]; then \
+		echo "Warning: Ghostscript is not installed. PDF optimization will be skipped."; \
+	fi
+	@if [ "$(PANDOC_INSTALLED)" = "no" ]; then \
+		echo "Warning: Pandoc is not installed. HTML and EPUB conversion will be skipped."; \
+	fi
 
-# Phony target to convert all SVG files to PDF every time
-convert-pdfs:
-ifeq ($(IMAGEMAGICK_INSTALLED),yes)
-	@echo "Converting SVG files to PDF..."
-	@for svg in $(SVG_FILES); do \
-		pdf=$${svg%.svg}.pdf; \
-		echo "Converting $$svg to $$pdf"; \
-		convert $$svg $$pdf; \
+# Rule for SVG to PDF conversion
+%.pdf: %.svg
+	@echo "Converting $< to $@"
+	@if [ "$(INKSCAPE_INSTALLED)" = "yes" ]; then \
+		inkscape --export-filename=$@ $< ; \
+	elif [ "$(IMAGEMAGICK_INSTALLED)" = "yes" ]; then \
+		magick $< $@ ; \
+	else \
+		echo "Error: Neither Inkscape nor ImageMagick is available for SVG conversion." ; \
+		exit 1 ; \
+	fi
+
+# Rule for EPS to PDF conversion
+%.pdf: %.eps
+	@echo "Converting $< to $@"
+	@if [ "$(EPSTOPDF_INSTALLED)" = "yes" ]; then \
+		epspdf $< ; \
+	elif [ "$(IMAGEMAGICK_INSTALLED)" = "yes" ]; then \
+		magick $< $@ ; \
+	else \
+		echo "Error: Neither epstopdf nor ImageMagick is available for EPS conversion." ; \
+		exit 1 ; \
+	fi
+
+# PDF compilation (depends on images)
+%.pdf: %.tex images
+	${LATEX} -pdf -use-make -f $<
+
+# Other format conversions (depend on PDFs)
+other-formats: optimize-pdfs html epub
+
+# PDF optimization
+optimize-pdfs: $(PDF_FILES)
+	@echo "Optimizing PDFs..."
+	@if [ "$(GS_INSTALLED)" = "yes" ]; then \
+		for pdf in $(PDF_FILES); do \
+			gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/printer -dNOPAUSE -dQUIET -dBATCH \
+				-sOutputFile=$${pdf%.pdf}_optimized.pdf $$pdf ; \
+			echo "Optimized PDF created: $${pdf%.pdf}_optimized.pdf" ; \
+		done \
+	else \
+		echo "Ghostscript not found. Skipping PDF optimization." ; \
+	fi
+
+# HTML conversion
+html: $(PDF_FILES)
+	@echo "Converting to HTML..."
+	@if [ "$(PANDOC_INSTALLED)" = "yes" ]; then \
+		for tex in $(TEX_FILES); do \
+			pandoc $$tex -o $${tex%.tex}.html ; \
+			echo "HTML version created: $${tex%.tex}.html" ; \
+		done \
+	else \
+		echo "Pandoc not found. Skipping HTML conversion." ; \
+	fi
+
+# EPUB conversion
+epub: $(PDF_FILES)
+	@echo "Converting to EPUB..."
+	@if [ "$(PANDOC_INSTALLED)" = "yes" ]; then \
+		for tex in $(TEX_FILES); do \
+			pandoc $$tex -o $${tex%.tex}.epub ; \
+			echo "EPUB version created: $${tex%.tex}.epub" ; \
+		done \
+	else \
+		echo "Pandoc not found. Skipping EPUB conversion." ; \
+	fi
+
+# Watcher for continuous compilation
+watch:
+	@echo "Watching for changes in .tex files..."
+	@while true; do \
+		inotifywait -e modify -r . ; \
+		make all; \
 	done
-else
-	@echo "Skipping SVG to PDF conversion because ImageMagick is not installed."
-endif
-
-pdf:
-	${LATEX} -pdf -f
-
-pdf-watcher:
-	${LATEX} -pvc -pdf
-
